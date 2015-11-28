@@ -25,8 +25,24 @@ D3.createContextOnCanvas = function (canvas) {
 		};
 	}
 
-	D3.FLOAT32 = gl.FLOAT;
-	D3.TRIANGLE_STRIP = gl.TRIANGLE_STRIP;
+	context.AttribType = {
+		Byte: gl.BYTE,
+		Short: gl.SHORT,
+		UnsignedByte: gl.UNSIGNED_BYTE,
+		UnsignedShort: gl.UNSIGNED_SHORT,
+		Fixed: gl.FIXED,
+		Float: gl.FLOAT
+	};
+
+	context.Primitive = {
+		Points: gl.POINTS,
+		Lines: gl.LINES,
+		LineStrip: gl.LINE_STRIP,
+		LineLoop: gl.LINE_LOOP,
+		Triangles: gl.TRIANGLES,
+		TriangleStrip: gl.TRIANGLE_STRIP,
+		TriangleFan: gl.TRIANGLE_FAN
+	}
 
 	state.viewport = [0, 0, canvas.width, canvas.height];
 	gl.viewport(0, 0, canvas.width, canvas.height);
@@ -122,7 +138,25 @@ D3.createContextOnCanvas = function (canvas) {
 	}
 
 	var bindUniform = function (name, uni) {
-		throw 'Not implemented';
+		var loc = gl.getUniformLocation(state.program, name);
+		if (loc < 0) {
+			return;
+		}
+
+		if (typeof uni === 'number') {
+			gl.uniform1f(loc, uni);
+		}
+		else if (uni.length) {
+			switch (uni.length) {
+				case 1: gl.uniform1fv(loc, uni); break;
+				case 2: gl.uniform2fv(loc, uni); break;
+				case 3: gl.uniform3fv(loc, uni); break;
+				case 4: gl.uniform4fv(loc, uni); break;
+				default: throw D3.Exception('Invalid uniform array length');
+			}
+		} else {
+			throw D3.Exception('Invalid uniform type');
+		}
 	}
 
 	var bindAttribute = function (name, attr) {
