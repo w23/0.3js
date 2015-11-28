@@ -17,7 +17,8 @@ precision mediump float;
 uniform float uf_time;
 varying vec2 vv2_v;
 void main() {
-	gl_FragColor = vec4(vv2_v,sin(uf_time),1.);
+	float c = mod(gl_FragCoord.x,2.) * mod(gl_FragCoord.y,2.);
+	gl_FragColor = vec4(c, c, c, 1.);
 }</pre>
 		</div><div class="column">
 			<canvas id="glcanvas">No WebGL support :(</canvas>

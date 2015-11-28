@@ -169,17 +169,18 @@ D3.createContextOnCanvas = function (canvas) {
 
 		tex.bind.apply(this);
 
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-
 		tex.uploadEmpty = function (format, width_in, height_in) {
 			this.bind();
 			width = width_in;
 			height = height_in;
 			gl.texImage2D(gl.TEXTURE_2D, 0, format.format,
 				width, height, 0, format.format, format.type, null);
+
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);//LINEAR_MIPMAP_NEAREST);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
 			return this;
 		}
 
@@ -221,7 +222,7 @@ D3.createContextOnCanvas = function (canvas) {
 
 			this.bind();
 			gl.framebufferTexture2D(gl.FRAMEBUFFER,
-				gl.COLOR_ATTACHMENT0, gl.TEXTURE2D, texture.getName(), 0);
+				gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture.getName(), 0);
 
 			return this;
 		}
@@ -407,7 +408,7 @@ D3.createContextOnCanvas = function (canvas) {
 					break;
 				}
 			}
-			if (!unit) {
+			if (unit === undefined) {
 				for (var i = 0; i < state.textures.length; i += 1) {
 					if (!state.textures[i]) {
 						gl.activeTexture(gl.TEXTURE0 + i);
@@ -417,7 +418,7 @@ D3.createContextOnCanvas = function (canvas) {
 						break;
 					}
 				}
-				if (!unit) {
+				if (unit === undefined) {
 					throw D3.Exception('Too many textures bound');
 				}
 			}
