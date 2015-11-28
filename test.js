@@ -20,6 +20,27 @@ function start() {
 			fragment: editor.getValue()
 		});
 
+		var texture = ctx.createTexture()
+			.uploadEmpty(ctx.TextureFormat.RGBA_8, 512, 512);
+		
+		var fb = ctx.createFramebuffer()
+			.attachColor(texture);
+
+		var source = {
+			program: program,
+			attributes: {
+				'av2_vtx': {
+					buffer: buffer,
+					size: 2,
+					type: ctx.AttribType.Float,
+					offset: 0
+				}
+			},
+			uniforms: {},
+			mode: ctx.Primitive.TriangleStrip,
+			count: 4
+		};
+
 		editor.getSession().on('change', function(e) {
 			try {
 				program = ctx.createProgram({
@@ -41,24 +62,11 @@ function start() {
 
 			var time = (Date.now() - starttime) * 0.001;
 
-			ctx.fill({color: [Math.sin(time), 0, 0, 1]});
+			//ctx.fill({color: [Math.sin(time), 0, 0, 1]});
 
-			ctx.paint({
-				program: program,
-				attributes: {
-					'av2_vtx': {
-						buffer: buffer,
-						size: 2,
-						type: ctx.AttribType.Float,
-						offset: 0
-					}
-				},
-				uniforms: {
-					'uf_time': time
-				},
-				mode: ctx.Primitive.TriangleStrip,
-				count: 4
-			});
+			source.uniforms['uf_time'] = ctx.UniformFloat(time);
+
+			ctx.rasterize(source);
 		}
 
 		paint();

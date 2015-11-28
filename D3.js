@@ -11,6 +11,11 @@ D3.createContextOnCanvas = function (canvas) {
 	}
 
 	var gl = canvas.getContext('webgl');
+
+	if (!gl) {
+		throw D3.Exception('Cannot acquire WebGL context');
+	}
+
 	var context = {};
 	var state = {
 		buffers: {},
@@ -20,12 +25,7 @@ D3.createContextOnCanvas = function (canvas) {
 		active_texture: 0
 	};
 
-	if (!gl) {
-		throw {
-			name: 'D3.NoGL',
-			message: 'Cannot acquire WebGL context'
-		};
-	}
+	state.textures[gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS) - 1] = null;
 
 	context.AttribType = {
 		Byte: gl.BYTE,
@@ -44,7 +44,7 @@ D3.createContextOnCanvas = function (canvas) {
 		Triangles: gl.TRIANGLES,
 		TriangleStrip: gl.TRIANGLE_STRIP,
 		TriangleFan: gl.TRIANGLE_FAN
-	}
+	};
 
 	var makeShader = function (source, type) {
 		var shader = gl.createShader(type);
@@ -56,7 +56,7 @@ D3.createContextOnCanvas = function (canvas) {
 		}
 
 		return shader;
-	}
+	};
 
 	context.createProgram = function (sources) {
 		var program = gl.createProgram();
@@ -72,7 +72,7 @@ D3.createContextOnCanvas = function (canvas) {
 		}
 
 		return program;
-	}
+	};
 
 	var createBuffer = function (type) {
 		var name = gl.createBuffer();
@@ -171,15 +171,15 @@ D3.createContextOnCanvas = function (canvas) {
 
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.LINEAR);
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.LINEAR);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
 
 		tex.uploadEmpty = function (format, width_in, height_in) {
 			this.bind();
 			width = width_in;
 			height = height_in;
 			gl.texImage2D(gl.TEXTURE_2D, 0, format.format,
-				width, height, 0, format.type, null);
+				width, height, 0, format.format, format.type, null);
 			return this;
 		}
 
@@ -205,20 +205,23 @@ D3.createContextOnCanvas = function (canvas) {
 		var that = {};
 
 		var texture = null;
-		var viewport = null;
 		var depth = null;
+
+		that.getWidth = function () {
+			return texture.getWidth();
+		}
+
+		that.getHeight = function () {
+			return texture.getHeight();
+		}
 
 		that.attachColor = function (texture_in) {
 			if (texture) { throw D3.Exception('Invalid argument'); }
 			texture = texture_in;
 
-			gl.bindFramebuffer(gl.FRAMEBUFFER, name);
+			this.bind();
 			gl.framebufferTexture2D(gl.FRAMEBUFFER,
 				gl.COLOR_ATTACHMENT0, gl.TEXTURE2D, texture.getName(), 0);
-
-			if (!viewport) {
-				viewport = [0, 0, texture.getWidth(), texture.getHeight()];
-			}
 
 			return this;
 		}
@@ -229,11 +232,6 @@ D3.createContextOnCanvas = function (canvas) {
 				width: 0,
 				height: 0
 			};
-			return this;
-		}
-
-		that.specifyViewport = function (x, y, w, h) {
-			viewport = [x, y, w, h];
 			return this;
 		}
 
@@ -258,28 +256,39 @@ D3.createContextOnCanvas = function (canvas) {
 				}
 			}
 
-			gl.viewport.apply(gl, viewport);
+			var status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+			if (status !== gl.FRAMEBUFFER_COMPLETE) {
+				throw D3.Exception('Framebuffer incomplete');
+			}
 		}
 
 		return that;
 	}
 
-	context.setDestination = function (destdesc) {
-		var viewport = des
-		if (!destdesc) {
-			destdesc = {}
-			destdesc.viewport = [0, 0, canvas.width, canvas.height];
+	var setup_destination = function (dest) {
+		if (dest) {
+			if (dest.framebuffer) {
+				dest.framebuffer.use();
+				if (!dest.viewport) {
+					gl.viewport(0, 0,
+						dest.framebuffer.getWidth(), dest.framebuffer.getHeight());
+				}
+			}
+			if (dest.viewport) {
+				gl.viewport.apply(gl, dest.viewport);
+			}
+		} else {
+			if (state.framebuffer) {
+				gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+				state.framebuffer = null;
+			}
+			gl.viewport(0, 0, canvas.width, canvas.height);
 		}
-
-		//if ()
-		gl.viewport(0, 0, canvas.width, canvas.height);
-	}
-	
-	context.setWrite = function (writedesc) {
-		throw D3.Exception('Not implemented');
 	}
 
-	context.fill = function (filldesc) {
+	context.fill = function (filldesc, destination) {
+		setup_destination.apply(this, [destination]);
+
 		var color = filldesc.color;
 		var depth = filldesc.depth;
 		var bits = 0;
@@ -298,23 +307,8 @@ D3.createContextOnCanvas = function (canvas) {
 
 	var bindUniform = function (name, uni) {
 		var loc = gl.getUniformLocation(state.program, name);
-		if (loc < 0) {
-			return;
-		}
-
-		if (typeof uni === 'number') {
-			gl.uniform1f(loc, uni);
-		}
-		else if (uni.length) {
-			switch (uni.length) {
-				case 1: gl.uniform1fv(loc, uni); break;
-				case 2: gl.uniform2fv(loc, uni); break;
-				case 3: gl.uniform3fv(loc, uni); break;
-				case 4: gl.uniform4fv(loc, uni); break;
-				default: throw D3.Exception('Invalid uniform array length');
-			}
-		} else {
-			throw D3.Exception('Invalid uniform type');
+		if (loc) {
+			uni(loc);
 		}
 	}
 
@@ -330,16 +324,19 @@ D3.createContextOnCanvas = function (canvas) {
 		state.attributes[index] = true;
 	}
 
-	context.paint = function (paintdesc, write, framebuffer) {
-		if (framebuffer) {
-			framebuffer.use();
-		} else {
-
-		}
-
+	var do_paint = function (paintdesc) {
 		if (state.program !== paintdesc.program) {
 			state.program = paintdesc.program;
 			gl.useProgram(state.program);
+		}
+
+		for (var i = 0; i < state.textures.length; i += 1) {
+			if (state.textures[i]) {
+				gl.activeTexture(gl.TEXTURE0 + i);
+				state.active_texture = i;
+				gl.bindTexture(gl.TEXTURE_2D, null);
+				state.textures[i] = null;
+			}
 		}
 
 		if (paintdesc.uniforms) {
@@ -368,6 +365,63 @@ D3.createContextOnCanvas = function (canvas) {
 			gl.drawElements(paintdesc.mode, paintesc.count, paintdesc.index.type || gl.UNSIGNED_SHORT, paintesc.index.offset || 0);
 		} else {
 			gl.drawArrays(paintdesc.mode, paintdesc.first || 0, paintdesc.count);
+		}
+	}
+
+	context.rasterize = function (source, write, destination) {
+		setup_destination.apply(this, [destination]);
+		do_paint.apply(this, [source]);
+		return this;
+	}
+
+	context.UniformFloat = function (value) {
+		return function (loc) {
+			gl.uniform1f(loc, value);
+		}
+	}
+
+	context.UniformVec2 = function (value) {
+		return function (loc) {
+			gl.uniform2fv(loc, value);
+		}
+	}
+
+	context.UniformVec3 = function (value) {
+		return function (loc) {
+			gl.uniform3fv(loc, value);
+		}
+	}
+
+	context.UniformVec4 = function (value) {
+		return function (loc) {
+			gl.uniform4fv(loc, value);
+		}
+	}
+
+	context.UniformSampler = function (texture) {
+		return function (loc) {
+			var unit = undefined;
+			for (var i = 0; i < state.textures.length; i += 1) {
+				if (state.textures[i] === texture) {
+					unit = i;
+					break;
+				}
+			}
+			if (!unit) {
+				for (var i = 0; i < state.textures.length; i += 1) {
+					if (!state.textures[i]) {
+						gl.activeTexture(gl.TEXTURE0 + i);
+						state.active_texture = i;
+						texture.bind();
+						unit = i;
+						break;
+					}
+				}
+				if (!unit) {
+					throw D3.Exception('Too many textures bound');
+				}
+			}
+			gl.uniform1i(loc, unit);
 		}
 	}
 
