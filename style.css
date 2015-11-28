@@ -1,13 +1,30 @@
 body {
-	width: 100%;
-	height: 100%;
-	margin: 0;
+	background: #808080;
 }
 
-canvas#glcanvas {
+#entire {
+	background: #f08080;
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: 0;
+	right: 0;
+}
+
+.column {
+	display: inline-block;
+	width: 50%;
+	height: 100%;
+}
+
+#glcanvas {
 	width: 100%;
 	height: 100%;
-	margin: 0;
-	padding: 0;
-	border: 0;
+}
+
+#editor {
+	width: 100%;
+	height: 100%;
+	font-size: 11px;
+	line-height: 1.2;
 }
