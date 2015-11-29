@@ -53,7 +53,25 @@ function start() {
 						type: uniform[1],
 						name: uniform[2],
 						kind: uniform[3],
-						settings: JSON.parse(uniform[4])
+						settings: JSON.parse(uniform[4]),
+						handler: (
+							function (typename, name) {
+								var type;
+								if (typename === 'float') {
+									type = ctx.UniformFloat;
+								} else if (typename === 'vec2') {
+									type = ctx.UniformVec2;
+								} else if (typename === 'vec3') {
+									type = ctx.UniformVec3;
+								} else if (typename === 'vec4') {
+									type = ctx.UniformVec4;
+								}
+								return function (value) {
+									console.log(value);
+									source.uniforms[name] = type(value);
+								};
+
+						})(uniform[1], uniform[2])
 					});
 				} catch (e) {
 					console.log(e);
@@ -166,7 +184,7 @@ function start() {
 
 		var controls = [];
 
-		var createSlider = function (name, id, limits) {
+		var createSlider = function (name, id, limits, handler) {
 			var label = document.createElement("label");
 			label.setAttribute('id', id);
 			label.innerHTML = name;
@@ -179,7 +197,7 @@ function start() {
 			input.setAttribute('max', limits['max']);
 			input.setAttribute('step', limits['step']);
 			input.addEventListener('input', function (){
-				console.log(id, input.value);
+				handler(input.value);
 			});
 			label.appendChild(input);
 			return label;
@@ -196,45 +214,73 @@ function start() {
 			return fieldset;
 		}
 
-		var createColor = function (name, id) {
+		var createColor = function (name, id, handler) {
 			var label = document.createElement("label");
 			label.setAttribute('id', id);
 			label.innerHTML = name;
 
 			var input = document.createElement("input");
-			label.setAttribute('id', id + ':input');
-			label.setAttribute('type', 'color');
+			input.setAttribute('id', id + ':input');
+			input.setAttribute('type', 'color');
+			input.addEventListener('input', function (){
+				handler(input.value);
+			});
 			label.appendChild(input);
 			return label;
+		}
+
+		var makeCurryer = function (arr, index, handler) {
+			return function (value) {
+				arr[index] = value;
+				handler(arr);
+			}
 		}
 
 		var createElement = function (id, uni) {
 			switch (uni.type) {
 				case 'float':
-					return createSlider(uni.name, id, uni.settings);
+					return createSlider(uni.name, id, uni.settings, uni.handler);
 				case 'vec2':
+					var value = [0, 0];
+					uni.handler(value);
 					var sliders = [
-						createSlider("X/R", id + ':X', uni.settings),
-						createSlider("Y/G", id + ':Y', uni.settings)
+						createSlider("X/R", id + ':X', uni.settings,
+							makeCurryer(value, 0, uni.handler)),
+						createSlider("Y/G", id + ':Y', uni.settings,
+							makeCurryer(value, 1, uni.handler))
 					];
 					return createFieldset(uni.name, id, sliders);
 				case 'vec3':
+					var value = [0, 0, 0];
+					uni.handler(value);
 					if (uni.kind === 'color') {
-						return createColor(uni.name, id, uni.settings);
+						return createColor(uni.name, id, uni.settings,
+							function (value) {
+								console.log(value);
+							});
 					} else {
 						var sliders = [
-							createSlider("X/R", id + ':X', uni.settings),
-							createSlider("Y/G", id + ':Y', uni.settings),
-							createSlider("Z/B", id + ':Z', uni.settings)
+							createSlider("X/R", id + ':X', uni.settings,
+								makeCurryer(value, 0, uni.handler)),
+							createSlider("Y/G", id + ':Y', uni.settings,
+								makeCurryer(value, 1, uni.handler)),
+							createSlider("Z/B", id + ':Z', uni.settings,
+								makeCurryer(value, 2, uni.handler))
 						];
 						return createFieldset(uni.name, id, sliders);
 					}
 				case 'vec4':
+					var value = [0, 0, 0, 0];
+					uni.handler(value);
 					var sliders = [
-						createSlider("X/R", id + ':X', uni.settings),
-						createSlider("Y/G", id + ':X', uni.settings),
-						createSlider("Z/B", id + ':Z', uni.settings),
-						createSlider("W/A", id + ':W', uni.settings)
+						createSlider("X/R", id + ':X', uni.settings,
+							makeCurryer(value, 0, uni.handler)),
+						createSlider("Y/G", id + ':X', uni.settings,
+							makeCurryer(value, 1, uni.handler)),
+						createSlider("Z/B", id + ':Z', uni.settings,
+							makeCurryer(value, 2, uni.handler)),
+						createSlider("W/A", id + ':W', uni.settings,
+							makeCurryer(value, 3, uni.handler))
 					];
 					return createFieldset(uni.name, id, sliders);
 					
