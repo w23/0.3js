@@ -214,6 +214,15 @@ function start() {
 			return fieldset;
 		}
 
+		var hexToRgb = function (hex) {
+			var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+			return result ? {
+				r: parseInt(result[1], 16),
+				g: parseInt(result[2], 16),
+				b: parseInt(result[3], 16)
+			} : null;
+		}
+
 		var createColor = function (name, id, handler) {
 			var label = document.createElement("label");
 			label.setAttribute('id', id);
@@ -223,7 +232,8 @@ function start() {
 			input.setAttribute('id', id + ':input');
 			input.setAttribute('type', 'color');
 			input.addEventListener('input', function (){
-				handler(input.value);
+				var rgb = hexToRgb(input.value);
+				handler([rgb.r/255.0, rgb.g/255.0, rgb.b/255.0]);
 			});
 			label.appendChild(input);
 			return label;
@@ -254,9 +264,9 @@ function start() {
 					var value = [0, 0, 0];
 					uni.handler(value);
 					if (uni.kind === 'color') {
-						return createColor(uni.name, id, uni.settings,
+						return createColor(uni.name, id,
 							function (value) {
-								console.log(value);
+								uni.handler(value);
 							});
 					} else {
 						var sliders = [
